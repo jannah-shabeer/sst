@@ -471,16 +471,41 @@
             let iconClass = 'fa-leaf text-emerald-400';
             let titleText = 'ECOSYSTEM THRIVING: Sustainable industrial practices and healthy green canopy.';
 
+            // --- Dynamic Diagnostic Box Elements ---
+            let impactBox = document.getElementById('impact-content-box');
+            let impactHeading = document.getElementById('impact-heading');
+            let impactDesc = document.getElementById('impact-desc');
+
             if (healthPct < 35) {
                 themeColor = '#F43F5E';
                 alertBoxClass = 'bg-rose-950/40 border-rose-900';
                 iconClass = 'fa-skull text-rose-500';
                 titleText = 'CRITICAL HAZARD: Excessive emissions causing severe wildlife displacement.';
+                
+                // Critical state diagnostic text & styling
+                impactBox.className = 'bg-rose-950/20 border border-rose-900/50 rounded-lg p-4';
+                impactHeading.className = 'text-rose-400 font-bold text-xs mb-1.5 flex items-center gap-2';
+                impactHeading.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> CRITICAL DEGRADATION STATE:`;
+                impactDesc.innerText = 'Ecosystem collapse imminent. Severe wildlife displacement, toxic river runoff, and heavy smog blocking natural sunlight.';
+
             } else if (healthPct < 70) {
                 themeColor = '#F59E0B';
                 alertBoxClass = 'bg-amber-950/40 border-amber-900';
                 iconClass = 'fa-triangle-exclamation text-amber-400';
                 titleText = 'MODERATE STRESS: Industrial output straining river and local atmospheric balance.';
+                
+                // Moderate state diagnostic text & styling
+                impactBox.className = 'bg-amber-950/20 border border-amber-900/50 rounded-lg p-4';
+                impactHeading.className = 'text-amber-400 font-bold text-xs mb-1.5 flex items-center gap-2';
+                impactHeading.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> MODERATE ECOSYSTEM STRESS:`;
+                impactDesc.innerText = 'Industrial pollutants are starting to degrade air and water quality. Expanding green infrastructure is recommended to restore balance.';
+
+            } else {
+                // Optimal state diagnostic text & styling
+                impactBox.className = 'bg-emerald-950/20 border border-emerald-900/50 rounded-lg p-4';
+                impactHeading.className = 'text-emerald-400 font-bold text-xs mb-1.5 flex items-center gap-2';
+                impactHeading.innerHTML = `<i class="fa-solid fa-circle-check"></i> OPTIMAL BALANCED STATE:`;
+                impactDesc.innerText = 'Wildlife is flourishing. Birds are nesting safely, marine species are active, and foliage density is high.';
             }
 
             document.getElementById('health-pct-text').style.color = themeColor;
@@ -489,14 +514,6 @@
             document.getElementById('status-icon').className = `fa-solid mt-0.5 ${iconClass}`;
             document.getElementById('status-title').innerText = titleText;
             document.getElementById('status-title').style.color = themeColor;
-        }
-
-        function resetSimulation() {
-            state.pollution = { gas: 5, waste: 5, thermal: 5, noise: 5 };
-            state.infra = { trees: 0, solar: 0 };
-            ['gas', 'waste', 'thermal', 'noise'].forEach(k => document.getElementById(`val-${k}`).innerText = 5);
-            ['trees', 'solar'].forEach(k => document.getElementById(`cnt-${k}`).innerText = 0);
-            recalculateMetrics();
         }
 
         // --- RENDER ENGINE ---
