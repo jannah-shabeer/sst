@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Industrial Revolution & Ecosystem Tracker</title>
+    <title>The Industrial Pollution & Ecosystem Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Chakra+Petch:wght@600;700&display=swap');
         
@@ -26,18 +31,76 @@
         .canvas-container {
             position: relative;
             width: 100%;
-            height: 0;
-            padding-bottom: 50%; 
-            min-height: 380px;
+            aspect-ratio: 16 / 9;
+            min-height: 400px;
         }
 
         .modal-blur {
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(0.98); }
+        }
+
+        .live-pulse {
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- INITIAL STUDENT STARTUP MODAL -->
+    <div id="welcome-modal" class="fixed inset-0 bg-black/85 modal-blur z-50 flex items-center justify-center p-4">
+        <div class="bg-[#0B192C] border border-[#2A3F5F] max-w-md w-full rounded-2xl p-6 shadow-2xl flex flex-col gap-5">
+            <div class="text-center">
+                <div class="bg-sky-600/20 p-3 rounded-2xl border border-sky-500/30 text-sky-400 w-12 h-12 mx-auto flex items-center justify-center mb-3">
+                    <i class="fa-solid fa-user-graduate text-xl"></i>
+                </div>
+                <h2 class="text-lg font-extrabold text-white tech-font">Welcome to Eco & Factory Lab</h2>
+                <p class="text-xs text-slate-400 mt-1">Please enter your full name to begin the activity.</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <label for="user-name-input" class="text-xs font-bold text-slate-300">Your Full Name:</label>
+                <input type="text" id="user-name-input" placeholder="e.g. Jannah Shabeer" class="bg-[#080F19] border border-[#2A3F5F] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500" value="Jannah Shabeer">
+            </div>
+            <button onclick="startStudentSession()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition shadow-lg mt-2">
+                Enter Simulation Lab <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- FULLSCREEN TEACHER DASHBOARD (FIREBASE LIVE SYNC) -->
+    <div id="teacher-modal" class="fixed inset-0 bg-[#080F19] z-50 hidden flex flex-col">
+        <div class="bg-[#050B14] border-b border-[#172A46] p-5 flex items-center justify-between shadow-xl shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="bg-amber-600/30 p-3 rounded-xl border border-amber-500/40 text-amber-400">
+                    <i class="fa-solid fa-chalkboard-user text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-extrabold text-white tech-font">🔒 Live Teacher Dashboard</h2>
+                    <p class="text-xs text-slate-400 font-bold tracking-widest uppercase mt-0.5">Firebase Realtime Sync Active <span class="inline-block w-2 h-2 ml-1 rounded-full bg-emerald-500 animate-pulse"></span></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="clearAllScores()" class="px-4 py-2 bg-rose-950/40 border border-rose-900 text-rose-400 hover:bg-rose-900/50 hover:text-rose-300 rounded-lg text-xs font-bold transition">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Reset All Data
+                </button>
+                <button onclick="closeTeacherDashboard()" class="w-10 h-10 flex items-center justify-center bg-[#172A46] border border-[#2A3F5F] text-slate-300 hover:text-white hover:bg-[#1E3A5F] rounded-lg transition text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Grid displaying all students & their direct simulation inspectors -->
+            <div id="teacher-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                <!-- Populated dynamically via Firebase -->
+            </div>
+        </div>
+    </div>
 
     <!-- Header -->
     <header class="bg-[#050B14] border-b border-[#172A46] px-5 py-3 flex flex-wrap items-center justify-between z-30 shadow-2xl sticky top-0 gap-3">
@@ -47,25 +110,53 @@
             </div>
             <div>
                 <h1 class="font-extrabold text-base sm:text-lg tracking-wide tech-font text-[#F5F5DC]">
-                    THE INDUSTRIAL REVOLUTION & ECOSYSTEM TRACKER
+                    THE INDUSTRIAL POLLUTION & ECOSYSTEM TRACKER
                 </h1>
-                <p class="text-[10px] text-sky-400 font-semibold tracking-wider uppercase">The Age of Industrialisation - Eco & Factory Lab</p>
+                <p id="header-subtitle" class="text-[10px] text-sky-400 font-semibold tracking-wider uppercase">Student Lab • Jannah Shabeer (10G)</p>
             </div>
         </div>
 
         <!-- Top Action Buttons -->
         <div class="flex items-center gap-3">
-            <button onclick="openModal('impacts-modal')" class="px-4 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs transition border border-sky-400/30 flex items-center gap-2 shadow-lg">
-                <i class="fa-solid fa-table-cells"></i> CAUSES AND IMPACT OF POLLUTION
+            <button onclick="openModal('impacts-modal')" class="px-3.5 py-2 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs transition border border-sky-400/30 flex items-center gap-2 shadow-lg">
+                <i class="fa-solid fa-table-cells"></i> CAUSES & IMPACTS OF POLLUTION
             </button>
-            <button onclick="openModal('prevention-modal')" class="px-4 py-2 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs transition border border-emerald-400/30 flex items-center gap-2 shadow-lg">
-                <i class="fa-solid fa-user-shield"></i> STUDENT PREVENTION MEASURES
+            <button onclick="openModal('prevention-modal')" class="px-3.5 py-2 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs transition border border-emerald-400/30 flex items-center gap-2 shadow-lg">
+                <i class="fa-solid fa-user-shield"></i> PREVENTIVE METHODS FOR STUDENTS
             </button>
-            <button onclick="resetSimulation()" class="px-3 py-2 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-[#EAE0C8] font-bold text-xs transition border border-[#2A3F5F] flex items-center gap-2">
+            <button onclick="resetSimulation()" class="px-3 py-2 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-[#EAE0C8] font-bold text-xs transition border border-[#2A3F5F] flex items-center gap-2" title="Reset Simulation">
                 <i class="fa-solid fa-rotate-left"></i>
             </button>
         </div>
     </header>
+
+    <!-- LIVE SCOREBOARD BANNER -->
+    <section class="bg-[#0A1628] border-b border-[#172A46] px-4 py-2.5 z-20">
+        <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+            
+            <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex items-center gap-2 bg-[#050B14] px-3 py-1.5 rounded-lg border border-sky-500/30">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 live-pulse"></span>
+                    <span id="active-user-display" class="text-[11px] font-black tracking-wider text-sky-300 tech-font uppercase">USER: JANNAH SHABEER</span>
+                </div>
+
+                <div class="flex items-center gap-2 bg-[#080F19] px-3 py-1 rounded-lg border border-[#172A46]">
+                    <span class="text-slate-400 font-bold">ECO SCORE:</span>
+                    <span id="score-pts" class="tech-font font-black text-rose-500 text-sm">0 / 1000</span>
+                </div>
+
+                <div class="flex items-center gap-2 bg-[#080F19] px-3 py-1 rounded-lg border border-[#172A46]">
+                    <span class="text-slate-400 font-bold">ECO GRADE:</span>
+                    <span id="score-grade" class="tech-font font-black text-rose-500 text-sm">F</span>
+                </div>
+
+                <div class="hidden md:flex items-center gap-2 bg-[#080F19] px-3 py-1 rounded-lg border border-[#172A46]">
+                    <span class="text-slate-400 font-bold">CLEAN ENERGY:</span>
+                    <span id="score-clean-energy" class="tech-font font-black text-sky-400 text-sm">0%</span>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col lg:flex-row p-3 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto">
@@ -73,27 +164,30 @@
         <!-- Canvas Viewport -->
         <div class="flex-1 flex flex-col bg-[#0B192C] rounded-2xl border border-[#172A46] overflow-hidden relative shadow-2xl">
             
+            <button onclick="toggleExpandCanvas()" class="absolute top-4 right-4 z-20 bg-[#080F19]/85 backdrop-blur-md border border-[#2A3F5F] hover:bg-[#1E3A5F] text-slate-200 p-2.5 rounded-xl shadow-xl transition flex items-center justify-center" title="Expand City View">
+                <i class="fa-solid fa-expand text-sm"></i>
+            </button>
+
             <!-- Floating HUD Overlay -->
             <div class="absolute top-4 left-4 z-20 pointer-events-none">
-                <div class="bg-[#080F19]/85 backdrop-blur-md border border-[#2A3F5F] rounded-xl px-5 py-3 flex items-center gap-6 shadow-2xl">
+                <div class="bg-[#080F19]/85 backdrop-blur-md border border-[#2A3F5F] rounded-xl px-4 py-2.5 flex items-center gap-4 shadow-2xl text-xs">
                     <div>
-                        <span class="text-[#8B9BB4] block text-[10px] font-bold tracking-wider">AIR QUALITY</span>
-                        <span id="overlay-aqi" class="font-black text-emerald-400 text-sm sm:text-base">AQI 45 (Good)</span>
+                        <span class="text-[#8B9BB4] block text-[9px] font-bold tracking-wider">AIR QUALITY</span>
+                        <span id="overlay-aqi" class="font-black text-rose-400 text-xs sm:text-sm">AQI 260 (Poor)</span>
                     </div>
-                    <div class="h-8 w-px bg-[#2A3F5F]"></div>
+                    <div class="h-6 w-px bg-[#2A3F5F]"></div>
                     <div>
-                        <span class="text-[#8B9BB4] block text-[10px] font-bold tracking-wider">RIVER TOXICITY</span>
-                        <span id="overlay-toxic" class="font-black text-emerald-400 text-sm sm:text-base">12 ppm</span>
+                        <span class="text-[#8B9BB4] block text-[9px] font-bold tracking-wider">RIVER TOXICITY</span>
+                        <span id="overlay-toxic" class="font-black text-rose-400 text-xs sm:text-sm">285 ppm</span>
                     </div>
-                    <div class="h-8 w-px bg-[#2A3F5F]"></div>
+                    <div class="h-6 w-px bg-[#2A3F5F]"></div>
                     <div>
-                        <span class="text-[#8B9BB4] block text-[10px] font-bold tracking-wider">NOISE LEVEL</span>
-                        <span id="overlay-noise" class="font-black text-emerald-400 text-sm sm:text-base">88 dB</span>
+                        <span class="text-[#8B9BB4] block text-[9px] font-bold tracking-wider">NOISE LEVEL</span>
+                        <span id="overlay-noise" class="font-black text-rose-400 text-xs sm:text-sm">98 dB</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Canvas Element -->
             <div class="canvas-container flex-1 bg-[#050B14]">
                 <canvas id="simCanvas" class="absolute inset-0 w-full h-full block"></canvas>
             </div>
@@ -102,88 +196,96 @@
         <!-- Right Control & Analysis Panel -->
         <div class="w-full lg:w-[380px] flex flex-col gap-4">
             
-            <!-- Health Index Box -->
-            <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col gap-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-xs font-extrabold tracking-wider text-[#94A3B8] uppercase flex items-center gap-2">
-                        <i class="fa-solid fa-heart-pulse text-rose-500"></i> Ecosystem Health Index
+            <div id="student-dashboard-view" class="flex flex-col gap-4">
+                <!-- Health Index Box -->
+                <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xs font-extrabold tracking-wider text-[#94A3B8] uppercase flex items-center gap-2">
+                            <i class="fa-solid fa-heart-pulse text-rose-500"></i> Ecosystem Health Index
+                        </h2>
+                        <span id="health-pct-text" class="text-3xl font-black tech-font text-rose-500">0%</span>
+                    </div>
+                    <div class="w-full bg-[#1E293B] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#334155]">
+                        <div id="health-bar-fill" class="bg-rose-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                    </div>
+                    <div id="status-alert-box" class="mt-1 bg-rose-950/40 border border-rose-900 rounded-lg p-3.5 flex items-start gap-3">
+                        <i id="status-icon" class="fa-solid fa-skull mt-0.5 text-rose-500"></i>
+                        <p id="status-title" class="text-xs font-bold text-rose-400 leading-relaxed">CRITICAL HAZARD: Excessive emissions causing severe wildlife displacement.</p>
+                    </div>
+                </div>
+
+                <!-- Impact Analysis / Environmental Diagnostic -->
+                <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col">
+                    <h2 class="text-xs font-extrabold tracking-wider text-[#94A3B8] uppercase mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sky-400"></i> Environmental Diagnostic
                     </h2>
-                    <span id="health-pct-text" class="text-3xl font-black tech-font text-emerald-400">82%</span>
-                </div>
-                <div class="w-full bg-[#1E293B] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#334155]">
-                    <div id="health-bar-fill" class="bg-emerald-400 h-full rounded-full transition-all duration-500" style="width: 82%;"></div>
-                </div>
-                <div id="status-alert-box" class="mt-1 bg-emerald-950/40 border border-emerald-900 rounded-lg p-3.5 flex items-start gap-3">
-                    <i id="status-icon" class="fa-solid fa-leaf mt-0.5 text-emerald-400"></i>
-                    <p id="status-title" class="text-xs font-bold text-emerald-300 leading-relaxed">ECOSYSTEM THRIVING: High biodiversity with clean air and vibrant aquatic life.</p>
-                </div>
-            </div>
-
-            <!-- Green Infrastructure Elements Controls -->
-            <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col gap-3">
-                <h2 class="text-xs font-extrabold tracking-wider text-emerald-400 uppercase flex items-center gap-2">
-                    <i class="fa-solid fa-seedling"></i> Green Infrastructure Elements (Max: 4)
-                </h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <!-- Trees Adder -->
-                    <div class="bg-[#172A46]/60 border border-[#2A3F5F] p-3 rounded-xl flex flex-col items-center">
-                        <span class="text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-tree text-emerald-400"></i> Trees</span>
-                        <div class="flex items-center gap-2.5 my-1">
-                            <button onclick="changeInfra('trees', -1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">-</button>
-                            <span id="cnt-trees" class="tech-font font-bold text-base text-sky-400">0</span>
-                            <button onclick="changeInfra('trees', 1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">+</button>
-                        </div>
-                    </div>
-
-                    <!-- Solar Panels Adder -->
-                    <div class="bg-[#172A46]/60 border border-[#2A3F5F] p-3 rounded-xl flex flex-col items-center">
-                        <span class="text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-solar-panel text-amber-400"></i> Solar</span>
-                        <div class="flex items-center gap-2.5 my-1">
-                            <button onclick="changeInfra('solar', -1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">-</button>
-                            <span id="cnt-solar" class="tech-font font-bold text-base text-sky-400">0</span>
-                            <button onclick="changeInfra('solar', 1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">+</button>
-                        </div>
+                    <div id="impact-content-box" class="bg-rose-950/20 border border-rose-900/50 rounded-lg p-4">
+                        <h3 id="impact-heading" class="text-rose-400 font-bold text-xs mb-1.5 flex items-center gap-2">
+                            <i class="fa-solid fa-triangle-exclamation"></i> CRITICAL DEGRADATION STATE:
+                        </h3>
+                        <p id="impact-desc" class="text-slate-300 text-xs leading-relaxed">
+                            Ecosystem collapse imminent. Severe toxic runoff and heavy smog block light. Add trees, solar panels, and prevention measures.
+                        </p>
                     </div>
                 </div>
-            </div>
 
-            <!-- Impact Analysis -->
-            <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col">
-                <h2 class="text-xs font-extrabold tracking-wider text-[#94A3B8] uppercase mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-line text-sky-400"></i> Environmental Diagnostic
-                </h2>
-                <div id="impact-content-box" class="bg-emerald-950/20 border border-emerald-900/50 rounded-lg p-4">
-                    <h3 id="impact-heading" class="text-emerald-400 font-bold text-xs mb-1.5 flex items-center gap-2">
-                        <i class="fa-solid fa-circle-check"></i> OPTIMAL BALANCED STATE:
-                    </h3>
-                    <p id="impact-desc" class="text-slate-300 text-xs leading-relaxed">
-                        Wildlife is flourishing. Birds are nesting safely, marine species are active, and foliage density is high.
-                    </p>
+                <!-- Green Infrastructure Controls -->
+                <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-5 shadow-xl flex flex-col gap-3">
+                    <h2 class="text-xs font-extrabold tracking-wider text-emerald-400 uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-seedling"></i> Green Infrastructure Elements (Max: 4)
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#172A46]/60 border border-[#2A3F5F] p-3 rounded-xl flex flex-col items-center">
+                            <span class="text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-tree text-emerald-400"></i> Trees</span>
+                            <div class="flex items-center gap-2.5 my-1">
+                                <button onclick="changeInfra('trees', -1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">-</button>
+                                <span id="cnt-trees" class="tech-font font-bold text-base text-sky-400">0</span>
+                                <button onclick="changeInfra('trees', 1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">+</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#172A46]/60 border border-[#2A3F5F] p-3 rounded-xl flex flex-col items-center">
+                            <span class="text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-solar-panel text-amber-400"></i> Solar</span>
+                            <div class="flex items-center gap-2.5 my-1">
+                                <button onclick="changeInfra('solar', -1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">-</button>
+                                <span id="cnt-solar" class="tech-font font-bold text-base text-sky-400">0</span>
+                                <button onclick="changeInfra('solar', 1)" class="w-8 h-8 bg-[#0B192C] hover:bg-[#1E3A5F] text-white rounded-lg font-bold border border-[#2A3F5F] text-xs">+</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Community Prevention Measures Checkbox Card -->
-            <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-4 shadow-xl flex flex-col gap-3">
-                <h2 class="text-xs font-extrabold tracking-wider text-emerald-400 uppercase flex items-center gap-2">
-                    <i class="fa-solid fa-shield text-emerald-400"></i> COMMUNITY PREVENTION MEASURES
-                </h2>
-                <div class="grid grid-cols-2 gap-2 text-xs text-slate-300">
-                    <label class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50">
-                        <input type="checkbox" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4">
-                        <span>Conserve Energy</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50">
-                        <input type="checkbox" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4">
-                        <span>Plant trees</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50">
-                        <input type="checkbox" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4">
-                        <span>Use Reusable Items</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50">
-                        <input type="checkbox" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4">
-                        <span>Recycle Properly</span>
-                    </label>
+                <!-- Community Prevention Measures Checkboxes -->
+                <div class="bg-[#0D1B2E] border border-[#1E293B] rounded-xl p-4 shadow-xl flex flex-col gap-3">
+                    <h2 class="text-xs font-extrabold tracking-wider text-emerald-400 uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-shield text-emerald-400"></i> COMMUNITY PREVENTION MEASURES
+                    </h2>
+                    <div id="community-preventions" class="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                        <label for="chk-energy" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-energy" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Conserve Energy</span>
+                        </label>
+                        <label for="chk-trees" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-trees" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Plant trees</span>
+                        </label>
+                        <label for="chk-reusable" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-reusable" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Use Reusable Items</span>
+                        </label>
+                        <label for="chk-recycle" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-recycle" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Recycle Properly</span>
+                        </label>
+                        <label for="chk-transport" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-transport" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Sustainable Transport</span>
+                        </label>
+                        <label for="chk-awareness" class="flex items-center gap-2 cursor-pointer bg-[#172A46]/40 p-2 rounded-lg border border-[#2A3F5F]/50 hover:bg-[#172A46]/70 transition">
+                            <input type="checkbox" id="chk-awareness" onchange="recalculateMetrics()" class="rounded bg-[#0B192C] border-[#2A3F5F] text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer">
+                            <span>Raise Eco-Awareness</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -194,61 +296,58 @@
     <footer class="bg-[#050B14] border-t border-[#172A46] p-4 z-20">
         <div class="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             
-            <!-- Toxic Gas Control -->
             <div class="bg-[#0D1B2E] p-3 rounded-xl border border-[#172A46] flex flex-col items-center justify-between">
                 <span class="text-[11px] font-extrabold text-[#EAE0C8] uppercase tracking-wider flex items-center gap-1.5">
                     <i class="fa-solid fa-smog text-sky-400"></i> Toxic Gas (Air)
                 </span>
                 <div class="flex items-center gap-3 my-2">
                     <button onclick="adjustPollution('gas', -1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">-</button>
-                    <span id="val-gas" class="tech-font text-2xl font-black text-amber-400">5</span>
+                    <span id="val-gas" class="tech-font text-2xl font-black text-rose-500">5</span>
                     <button onclick="adjustPollution('gas', 1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">+</button>
                 </div>
                 <span class="text-[9px] text-slate-400 font-bold">Scale: 0 - 10</span>
             </div>
 
-            <!-- Industrial Waste Control -->
             <div class="bg-[#0D1B2E] p-3 rounded-xl border border-[#172A46] flex flex-col items-center justify-between">
                 <span class="text-[11px] font-extrabold text-[#EAE0C8] uppercase tracking-wider flex items-center gap-1.5">
                     <i class="fa-solid fa-skull-crossbones text-rose-400"></i> Industrial Waste
                 </span>
                 <div class="flex items-center gap-3 my-2">
                     <button onclick="adjustPollution('waste', -1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">-</button>
-                    <span id="val-waste" class="tech-font text-2xl font-black text-rose-400">5</span>
+                    <span id="val-waste" class="tech-font text-2xl font-black text-rose-500">5</span>
                     <button onclick="adjustPollution('waste', 1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">+</button>
                 </div>
                 <span class="text-[9px] text-slate-400 font-bold">Scale: 0 - 10</span>
             </div>
 
-            <!-- Hot Discharge Control -->
             <div class="bg-[#0D1B2E] p-3 rounded-xl border border-[#172A46] flex flex-col items-center justify-between">
                 <span class="text-[11px] font-extrabold text-[#EAE0C8] uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-temperature-arrow-up text-orange-400"></i> Hot Discharge
+                    <i class="fa-solid fa-temperature-arrow-up text-orange-400"></i> Hot water Discharge
                 </span>
                 <div class="flex items-center gap-3 my-2">
                     <button onclick="adjustPollution('thermal', -1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">-</button>
-                    <span id="val-thermal" class="tech-font text-2xl font-black text-orange-400">5</span>
+                    <span id="val-thermal" class="tech-font text-2xl font-black text-rose-500">5</span>
                     <button onclick="adjustPollution('thermal', 1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">+</button>
                 </div>
                 <span class="text-[9px] text-slate-400 font-bold">Scale: 0 - 10</span>
             </div>
 
-            <!-- Outdated Noise Control -->
             <div class="bg-[#0D1B2E] p-3 rounded-xl border border-[#172A46] flex flex-col items-center justify-between">
                 <span class="text-[11px] font-extrabold text-[#EAE0C8] uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-volume-high text-yellow-400"></i> Outdated Noise
+                    <i class="fa-solid fa-volume-high text-yellow-400"></i> Outdated Machinery Noise
                 </span>
                 <div class="flex items-center gap-3 my-2">
                     <button onclick="adjustPollution('noise', -1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">-</button>
-                    <span id="val-noise" class="tech-font text-2xl font-black text-yellow-400">5</span>
+                    <span id="val-noise" class="tech-font text-2xl font-black text-rose-500">5</span>
                     <button onclick="adjustPollution('noise', 1)" class="w-9 h-9 rounded-lg bg-[#172A46] hover:bg-[#1E3A5F] text-white font-extrabold border border-[#2A3F5F] active:scale-95 transition">+</button>
                 </div>
                 <span class="text-[9px] text-slate-400 font-bold">Scale: 0 - 10</span>
             </div>
         </div>
+        
         <!-- Attribution Footer -->
         <div class="max-w-[1600px] mx-auto mt-3 pt-3 border-t border-[#172A46]/60 text-center">
-            <p class="text-[11px] text-[#8B9BB4] font-medium tracking-wide">
+            <p class="text-sm md:text-base text-[#8B9BB4] font-bold tracking-wide select-none cursor-pointer hover:text-slate-300 transition-colors">
                 Designed & Developed by Jannah Shabeer 10G
             </p>
         </div>
@@ -263,7 +362,7 @@
                         <i class="fa-solid fa-user-shield text-xl"></i>
                     </div>
                     <div>
-                        <h2 class="text-base font-extrabold text-white">Student Prevention Measures</h2>
+                        <h2 class="text-base font-extrabold text-white">Preventive Methods for Students</h2>
                         <p class="text-xs text-slate-400">Direct actions students take to reduce urban pollution.</p>
                     </div>
                 </div>
@@ -271,54 +370,49 @@
             </div>
 
             <div class="grid gap-3">
-    <!-- Conserve Energy -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-bolt"></i> Conserve Energy
-        </h3>
-        <p class="text-xs text-slate-300">Turn off lights, electronics, and cooling systems when leaving a room, and optimize appliance usage to reduce carbon emissions from power plants.</p>
-    </div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-bolt"></i> Conserve Energy
+                    </h3>
+                    <p class="text-xs text-slate-300">Turn off lights, electronics, and cooling systems when leaving a room, and optimize appliance usage to reduce carbon emissions from power plants.</p>
+                </div>
 
-    <!-- Plant Trees -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-tree"></i> Plant Trees
-        </h3>
-        <p class="text-xs text-slate-300">Actively participate in greening school and community spaces to enhance carbon sequestration, improve air quality, and restore natural habitats.</p>
-    </div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-tree"></i> Plant Trees
+                    </h3>
+                    <p class="text-xs text-slate-300">Actively participate in greening school and community spaces to enhance carbon sequestration, improve air quality, and restore natural habitats.</p>
+                </div>
 
-    <!-- Use Reusable Items -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-bottle-water"></i> Use Reusable Items
-        </h3>
-        <p class="text-xs text-slate-300">Substitute single-use plastics, water bottles, and stationery with durable, reusable alternatives to minimize landfill waste and production footprints.</p>
-    </div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-bottle-water"></i> Use Reusable Items
+                    </h3>
+                    <p class="text-xs text-slate-300">Substitute single-use plastics, water bottles, and stationery with durable, reusable alternatives to minimize landfill waste and production footprints.</p>
+                </div>
 
-    <!-- Recycle Properly -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-recycle"></i> Recycle Properly
-        </h3>
-        <p class="text-xs text-slate-300">Sort paper, plastics, glass, and metals into designated recycling streams to ensure materials are recovered and processed effectively.</p>
-    </div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-recycle"></i> Recycle Properly
+                    </h3>
+                    <p class="text-xs text-slate-300">Sort paper, plastics, glass, and metals into designated recycling streams to ensure materials are recovered and processed effectively.</p>
+                </div>
 
-    <!-- Sustainable Transport -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-bus"></i> Sustainable Transport
-        </h3>
-        <p class="text-xs text-slate-300">Walk, cycle, or use public transport and school buses instead of private vehicles to decrease daily vehicular emissions and noise pollution.</p>
-    </div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-bus"></i> Sustainable Transport
+                    </h3>
+                    <p class="text-xs text-slate-300">Walk, cycle, or use public transport and school buses instead of private vehicles to decrease daily vehicular emissions and noise pollution.</p>
+                </div>
 
-    <!-- Report & Raise Awareness -->
-    <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
-        <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-bullhorn"></i> Raise Awareness & Report Waste
-        </h3>
-        <p class="text-xs text-slate-300">Educate peers about industrial pollution hazards, participate in eco-clubs, and report illegal dumping or industrial waste discharge to local authorities.</p>
-    </div>
-</div>
+                <div class="bg-[#080F19] p-3.5 rounded-xl border border-[#172A46]">
+                    <h3 class="text-xs font-bold text-emerald-400 flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-bullhorn"></i> Raise Eco-Awareness & Report Waste
+                    </h3>
+                    <p class="text-xs text-slate-300">Educate peers about industrial pollution hazards, participate in eco-clubs, and report illegal dumping or industrial waste discharge to local authorities.</p>
+                </div>
+            </div>
+
             <button onclick="closeModal('prevention-modal')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition mt-2">
                 Return To Simulation
             </button>
@@ -381,59 +475,218 @@
         </div>
     </div>
 
-    <!-- CANVAS SIMULATION ENGINE -->
+    <!-- CANVAS SIMULATION ENGINE & APP LOGIC -->
     <script>
+        // ---------------- FIREBASE INITIALIZATION ---------------- //
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMV4aD-Nj2peWLsLA7np4AP28Ilb4Jh5M",
+            authDomain: "sstsimulation.firebaseapp.com",
+            databaseURL: "https://sstsimulation-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "sstsimulation",
+            storageBucket: "sstsimulation.firebasestorage.app",
+            messagingSenderId: "82241373120",
+            appId: "1:82241373120:web:c502254da554958ef73e25",
+            measurementId: "G-SWWWE5F2RS"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+        // --------------------------------------------------------- //
+
+        let currentUserName = "Jannah Shabeer";
+
+        function startStudentSession() {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            if (nameInput) {
+                currentUserName = nameInput;
+            }
+            document.getElementById('active-user-display').innerText = `USER: ${currentUserName.toUpperCase()}`;
+            document.getElementById('header-subtitle').innerText = `Student Lab • ${currentUserName} (10G)`;
+            document.getElementById('welcome-modal').classList.add('hidden');
+            recalculateMetrics();
+        }
+
+        let keyBuffer = "";
+        window.addEventListener('keydown', (e) => {
+            if (e.altKey && e.shiftKey && (e.code === 'KeyJ' || e.key.toUpperCase() === 'J')) {
+                e.preventDefault();
+                promptForTeacherPasskey();
+                return;
+            }
+
+            if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                keyBuffer += e.key.toUpperCase();
+                if (keyBuffer.length > 10) keyBuffer = keyBuffer.slice(-10);
+                if (keyBuffer.endsWith("JS23")) {
+                    keyBuffer = "";
+                    openTeacherDashboard();
+                }
+            }
+        });
+
+        function promptForTeacherPasskey() {
+            const passkey = prompt("Enter Teacher Access Passkey:");
+            if (passkey === "JS23") {
+                openTeacherDashboard();
+            } else if (passkey !== null) {
+                alert("Incorrect passkey!");
+            }
+        }
+
+        function openTeacherDashboard() {
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            db.ref('eco_classroom_scores').once('value').then(snapshot => {
+                renderTeacherGrid(snapshot.val() || {});
+            });
+        }
+
+        function closeTeacherDashboard() {
+            document.getElementById('teacher-modal').classList.add('hidden');
+        }
+
+        function saveStudentDataToStorage() {
+            if (!currentUserName) return;
+            
+            const healthPct = parseInt(document.getElementById('health-pct-text').innerText) || 0;
+            const scorePts = healthPct * 10;
+            const grade = document.getElementById('score-grade').innerText;
+
+            const data = {
+                score: scorePts,
+                health: healthPct,
+                grade: grade,
+                aqi: document.getElementById('overlay-aqi').innerText,
+                toxic: document.getElementById('overlay-toxic').innerText,
+                noise: document.getElementById('overlay-noise').innerText,
+                infra: `${state.infra.trees} Trees, ${state.infra.solar} Solar`
+            };
+            
+            db.ref('eco_classroom_scores/' + currentUserName).set(data).catch(err => {
+                console.warn("Firebase sync error:", err);
+            });
+        }
+
+        db.ref('eco_classroom_scores').on('value', (snapshot) => {
+            if (!document.getElementById('teacher-modal').classList.contains('hidden')) {
+                renderTeacherGrid(snapshot.val() || {});
+            }
+        });
+
+        function renderTeacherGrid(allData) {
+            const grid = document.getElementById('teacher-grid');
+            grid.innerHTML = '';
+
+            const sortedStudents = Object.entries(allData).sort((a, b) => b[1].score - a[1].score);
+
+            if (sortedStudents.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 font-bold">No live students connected yet.</div>`;
+                return;
+            }
+
+            sortedStudents.forEach(([name, data]) => {
+                grid.innerHTML += `
+                    <div class="bg-[#0B192C] border border-[#1E293B] rounded-2xl p-5 shadow-2xl flex flex-col gap-3">
+                        <div class="flex justify-between items-center border-b border-[#1E293B] pb-3 mb-1">
+                            <h3 class="font-extrabold text-white text-[15px] truncate max-w-[150px]" title="${name}">${name}</h3>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="font-black text-amber-400 text-xs">${data.score} PTS</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/30">${data.grade}</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[10px]">
+                            <div class="bg-[#050B14] p-2.5 rounded-lg border border-[#172A46]">
+                                <span class="text-slate-500 block font-bold mb-0.5 uppercase">Eco Health</span>
+                                <span class="font-black text-rose-500 text-xs">${data.health}%</span>
+                            </div>
+                            <div class="bg-[#050B14] p-2.5 rounded-lg border border-[#172A46]">
+                                <span class="text-slate-500 block font-bold mb-0.5 uppercase">Air Quality</span>
+                                <span class="font-black text-rose-400 text-xs">${data.aqi}</span>
+                            </div>
+                            <div class="bg-[#050B14] p-2.5 rounded-lg border border-[#172A46]">
+                                <span class="text-slate-500 block font-bold mb-0.5 uppercase">Water Toxic</span>
+                                <span class="font-black text-rose-400 text-xs">${data.toxic}</span>
+                            </div>
+                            <div class="bg-[#050B14] p-2.5 rounded-lg border border-[#172A46]">
+                                <span class="text-slate-500 block font-bold mb-0.5 uppercase">Noise dB</span>
+                                <span class="font-black text-rose-400 text-xs">${data.noise}</span>
+                            </div>
+                            <div class="bg-[#050B14] p-2.5 rounded-lg border border-[#172A46] col-span-2">
+                                <span class="text-slate-500 block font-bold mb-0.5 uppercase">Green Infra Check</span>
+                                <span class="font-black text-emerald-400 text-xs">${data.infra}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function clearAllScores() {
+            if (confirm("Are you sure you want to completely erase all student scores from the live database?")) {
+                db.ref('eco_classroom_scores').remove().then(() => {
+                    renderTeacherGrid({});
+                });
+            }
+        }
+
+        function toggleExpandCanvas() {
+            const container = document.querySelector('.canvas-container').parentElement;
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) container.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // State Machine (Wind removed)
         const state = {
-            pollution: {
-                gas: 5,
-                waste: 5,
-                thermal: 5,
-                noise: 5
-            },
-            infra: {
-                trees: 0,
-                solar: 0
-            },
+            pollution: { gas: 5, waste: 5, thermal: 5, noise: 5 },
+            infra: { trees: 0, solar: 0 },
             time: 0,
             smokeParticles: [],
-            steamParticles: [],
+            hotWaterParticles: [],
             birds: [],
             fishes: []
         };
 
-        // Initialize Birds & Fishes
         for (let i = 0; i < 14; i++) {
-            state.birds.push({
-                x: Math.random() * 1000,
-                y: 30 + Math.random() * 70,
-                speed: 1.2 + Math.random() * 1.5,
-                wingCycle: Math.random() * Math.PI * 2
-            });
+            state.birds.push({ x: Math.random() * 1000, y: 30 + Math.random() * 70, speed: 1.2 + Math.random() * 1.5, wingCycle: Math.random() * Math.PI * 2 });
         }
-
         for (let i = 0; i < 12; i++) {
-            state.fishes.push({
-                x: Math.random() * 1000,
-                y: 15 + Math.random() * 55,
-                speed: 0.8 + Math.random() * 1.2,
-                tailCycle: Math.random() * Math.PI * 2
-            });
+            state.fishes.push({ x: Math.random() * 1000, y: 15 + Math.random() * 55, speed: 0.8 + Math.random() * 1.2, tailCycle: Math.random() * Math.PI * 2 });
         }
 
         function resizeCanvas() {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width * (window.devicePixelRatio || 1);
-            canvas.height = rect.height * (window.devicePixelRatio || 1);
-            ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
         }
         window.addEventListener('resize', resizeCanvas);
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function resetSimulation() {
+            state.pollution.gas = 5;
+            state.pollution.waste = 5;
+            state.pollution.thermal = 5;
+            state.pollution.noise = 5;
+            state.infra.trees = 0;
+            state.infra.solar = 0;
+
+            document.querySelectorAll('#community-preventions input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+            document.getElementById('val-gas').innerText = 5;
+            document.getElementById('val-waste').innerText = 5;
+            document.getElementById('val-thermal').innerText = 5;
+            document.getElementById('val-noise').innerText = 5;
+            document.getElementById('cnt-trees').innerText = 0;
+            document.getElementById('cnt-solar').innerText = 0;
+
+            recalculateMetrics();
+        }
 
         function adjustPollution(key, val) {
             state.pollution[key] = Math.max(0, Math.min(10, state.pollution[key] + val));
@@ -448,64 +701,86 @@
         }
 
         function recalculateMetrics() {
-            let totalPollution = state.pollution.gas + state.pollution.waste + state.pollution.thermal + state.pollution.noise;
-            let totalGreen = (state.infra.trees * 2.5) + (state.infra.solar * 2.5);
-            
-            let rawHealth = 100 - ((totalPollution / 40) * 100) + totalGreen;
-            let healthPct = Math.max(0, Math.min(100, Math.round(rawHealth)));
+            let effectiveGas = state.pollution.gas;
+            let effectiveWaste = state.pollution.waste;
+            let effectiveThermal = state.pollution.thermal;
+            let effectiveNoise = state.pollution.noise;
+
+            let totalPollution = effectiveGas + effectiveWaste + effectiveThermal + effectiveNoise;
+            const checkedBoxes = document.querySelectorAll('#community-preventions input[type="checkbox"]:checked').length;
+            const totalCheckboxes = document.querySelectorAll('#community-preventions input[type="checkbox"]').length || 6;
+
+            let currentInfra = state.infra.trees + state.infra.solar; 
+            let infraScore = (currentInfra / 8) * 25; 
+            let preventionScore = (checkedBoxes / totalCheckboxes) * 25; 
+            let baseCleanScore = 50; 
+
+            let rawHealth = baseCleanScore + infraScore + preventionScore - ((totalPollution / 40) * 70);
+            let healthPct = totalPollution > 0 ? Math.min(99, Math.max(0, Math.round(rawHealth))) : Math.max(0, Math.min(100, Math.round(rawHealth)));
 
             document.getElementById('health-pct-text').innerText = `${healthPct}%`;
             const healthBar = document.getElementById('health-bar-fill');
             healthBar.style.width = `${healthPct}%`;
 
-            let aqi = Math.round(20 + (state.pollution.gas * 24) - (state.infra.trees * 4));
-            let toxicity = Math.round(5 + (state.pollution.waste * 22) + (state.pollution.thermal * 6));
-            let noise = Math.round(55 + (state.pollution.noise * 4.3));
+            let aqi = Math.round(20 + (effectiveGas * 24) - (state.infra.trees * 4));
+            let toxicity = Math.round(5 + (effectiveWaste * 22) + (effectiveThermal * 6));
+            let noise = Math.round(55 + (effectiveNoise * 4.3));
 
-            document.getElementById('overlay-aqi').innerText = `AQI ${Math.max(10, aqi)} (${aqi < 50 ? 'Good' : aqi < 120 ? 'Moderate' : 'Poor'})`;
+            document.getElementById('overlay-aqi').innerText = `AQI ${Math.max(10, aqi)} (${aqi < 50 ? 'Good' : aqi < 120 ? 'Mod' : 'Poor'})`;
             document.getElementById('overlay-toxic').innerText = `${Math.max(0, toxicity)} ppm`;
             document.getElementById('overlay-noise').innerText = `${noise} dB`;
+
+            let ecoPoints = Math.round(healthPct * 10);
+            let grade = 'F';
+            let gradeColor = '#F43F5E';
+            if (healthPct >= 90) { grade = 'A+'; gradeColor = '#10B981'; }
+            else if (healthPct >= 80) { grade = 'A'; gradeColor = '#34D399'; }
+            else if (healthPct >= 70) { grade = 'B+'; gradeColor = '#FBBF24'; }
+            else if (healthPct >= 55) { grade = 'C'; gradeColor = '#F59E0B'; }
+            else if (healthPct >= 40) { grade = 'D'; gradeColor = '#FB923C'; }
+
+            document.getElementById('score-pts').innerText = `${ecoPoints} / 1000`;
+            const scoreGradeEl = document.getElementById('score-grade');
+            scoreGradeEl.innerText = grade;
+            scoreGradeEl.style.color = gradeColor;
+
+            let cleanEnergyPct = Math.round((state.infra.solar / 4) * 100);
+            document.getElementById('score-clean-energy').innerText = `${cleanEnergyPct}%`;
+
+            saveStudentDataToStorage();
 
             let themeColor = '#10B981';
             let alertBoxClass = 'bg-emerald-950/40 border-emerald-900';
             let iconClass = 'fa-leaf text-emerald-400';
             let titleText = 'ECOSYSTEM THRIVING: Sustainable industrial practices and healthy green canopy.';
 
-            // --- Dynamic Diagnostic Box Elements ---
             let impactBox = document.getElementById('impact-content-box');
             let impactHeading = document.getElementById('impact-heading');
             let impactDesc = document.getElementById('impact-desc');
 
-            if (healthPct < 35) {
+            if (healthPct < 40) {
                 themeColor = '#F43F5E';
                 alertBoxClass = 'bg-rose-950/40 border-rose-900';
                 iconClass = 'fa-skull text-rose-500';
                 titleText = 'CRITICAL HAZARD: Excessive emissions causing severe wildlife displacement.';
-                
-                // Critical state diagnostic text & styling
                 impactBox.className = 'bg-rose-950/20 border border-rose-900/50 rounded-lg p-4';
                 impactHeading.className = 'text-rose-400 font-bold text-xs mb-1.5 flex items-center gap-2';
                 impactHeading.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> CRITICAL DEGRADATION STATE:`;
-                impactDesc.innerText = 'Ecosystem collapse imminent. Severe wildlife displacement, toxic river runoff, and heavy smog blocking natural sunlight.';
-
-            } else if (healthPct < 70) {
+                impactDesc.innerText = "Ecosystem collapse imminent. Severe toxic runoff and heavy smog block light. Add trees, solar panels, and prevention measures.";
+            } else if (healthPct < 75) {
                 themeColor = '#F59E0B';
                 alertBoxClass = 'bg-amber-950/40 border-amber-900';
                 iconClass = 'fa-triangle-exclamation text-amber-400';
                 titleText = 'MODERATE STRESS: Industrial output straining river and local atmospheric balance.';
-                
-                // Moderate state diagnostic text & styling
                 impactBox.className = 'bg-amber-950/20 border border-amber-900/50 rounded-lg p-4';
                 impactHeading.className = 'text-amber-400 font-bold text-xs mb-1.5 flex items-center gap-2';
                 impactHeading.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> MODERATE ECOSYSTEM STRESS:`;
-                impactDesc.innerText = 'Industrial pollutants are starting to degrade air and water quality. Expanding green infrastructure is recommended to restore balance.';
-
+                impactDesc.innerText = "Industrial pollutants are starting to degrade air and water quality. Adding trees and checking prevention measures will actively boost ecosystem health.";
             } else {
-                // Optimal state diagnostic text & styling
                 impactBox.className = 'bg-emerald-950/20 border border-emerald-900/50 rounded-lg p-4';
                 impactHeading.className = 'text-emerald-400 font-bold text-xs mb-1.5 flex items-center gap-2';
                 impactHeading.innerHTML = `<i class="fa-solid fa-circle-check"></i> OPTIMAL BALANCED STATE:`;
-                impactDesc.innerText = 'Wildlife is flourishing. Birds are nesting safely, marine species are active, and foliage density is high.';
+                impactDesc.innerText = "Wildlife is flourishing perfectly. Birds are nesting safely, marine species are active, and foliage density is high. Sustainable practices are maintaining ideal environmental health.";
             }
 
             document.getElementById('health-pct-text').style.color = themeColor;
@@ -516,26 +791,33 @@
             document.getElementById('status-title').style.color = themeColor;
         }
 
-        // --- RENDER ENGINE ---
-
-        function drawSky(w, h) {
+        function drawSky(w, skyH) {
             let p = state.pollution.gas / 10;
-            let grad = ctx.createLinearGradient(0, 0, 0, h * 0.55);
+            let grad = ctx.createLinearGradient(0, 0, 0, skyH);
             
-            let r1 = Math.round(150 * p + 15 * (1 - p));
-            let g1 = Math.round(30 * p + 160 * (1 - p));
-            let b1 = Math.round(30 * p + 230 * (1 - p));
+            let r1 = Math.round(85 * p + 15 * (1 - p));
+            let g1 = Math.round(75 * p + 160 * (1 - p));
+            let b1 = Math.round(60 * p + 230 * (1 - p));
 
             grad.addColorStop(0, `rgb(${r1}, ${g1}, ${b1})`);
-            grad.addColorStop(1, `rgb(${Math.round(120*p + 200*(1-p))}, ${Math.round(40*p + 230*(1-p))}, ${Math.round(30*p + 250*(1-p))})`);
+            grad.addColorStop(1, `rgb(${Math.round(65*p + 200*(1-p))}, ${Math.round(55*p + 230*(1-p))}, ${Math.round(45*p + 250*(1-p))})`);
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h * 0.55);
+            ctx.fillRect(0, 0, w, skyH);
 
-            // Sun
             ctx.fillStyle = `rgba(255, 235, 220, ${0.85 - p * 0.4})`;
             ctx.beginPath();
-            ctx.arc(w * 0.82, h * 0.16, 36, 0, Math.PI * 2);
+            ctx.arc(w * 0.82, skyH * 0.3, 36, 0, Math.PI * 2);
             ctx.fill();
+        }
+
+        function drawCityscape(w, groundY) {
+            let p = state.pollution.gas / 10;
+            ctx.fillStyle = `rgba(22, 36, 58, ${0.7 - (p*0.3)})`; 
+            ctx.fillRect(w*0.1, groundY-140, w*0.08, 140); 
+            ctx.fillRect(w*0.2, groundY-190, w*0.05, 190);
+            ctx.fillRect(w*0.45, groundY-160, w*0.09, 160); 
+            ctx.fillRect(w*0.56, groundY-210, w*0.06, 210);
+            ctx.fillRect(w*0.85, groundY-170, w*0.1, 170);
         }
 
         function drawMountains(w, groundY) {
@@ -551,7 +833,9 @@
         }
 
         function drawBirds(w, h) {
-            let maxBirds = Math.max(0, Math.round(state.birds.length * (1 - (state.pollution.gas + state.pollution.noise) / 20)));
+            let effGas = state.pollution.gas;
+            let effNoise = state.pollution.noise;
+            let maxBirds = Math.max(0, Math.round(state.birds.length * (1 - (effGas + effNoise) / 20)));
             ctx.strokeStyle = "rgba(30, 41, 59, 0.8)";
             ctx.lineWidth = 2;
 
@@ -572,34 +856,28 @@
         function drawTree(x, y, scale = 1) {
             ctx.save();
             ctx.translate(x, y);
-
-            // Trees wither/turn brown when gas or waste pollution is high
-            let isDying = state.pollution.gas > 5 || state.pollution.waste > 5;
+            let effGas = state.pollution.gas;
+            let effWaste = state.pollution.waste;
+            let isDying = effGas > 7 || effWaste > 7;
             
-            // Trunk
             ctx.fillStyle = isDying ? "#3D2314" : "#451A03";
             ctx.fillRect(-4 * scale, -20 * scale, 8 * scale, 20 * scale);
 
-            // Foliage Circles
             ctx.fillStyle = isDying ? "#785327" : "#16A34A";
             ctx.beginPath();
             ctx.arc(0, -30 * scale, 16 * scale, 0, Math.PI * 2);
             ctx.arc(-10 * scale, -22 * scale, 12 * scale, 0, Math.PI * 2);
             ctx.arc(10 * scale, -22 * scale, 12 * scale, 0, Math.PI * 2);
             ctx.fill();
-
             ctx.restore();
         }
 
         function drawHouse(x, y, solarCountForHouse) {
             ctx.save();
             ctx.translate(x, y);
-
-            // Main Building
             ctx.fillStyle = "#E2E8F0";
             ctx.fillRect(0, 0, 90, 65);
 
-            // Roof
             ctx.fillStyle = "#854D0E";
             ctx.beginPath();
             ctx.moveTo(-8, 0);
@@ -608,31 +886,24 @@
             ctx.closePath();
             ctx.fill();
 
-            // Precise Solar Panels rendering based on exact count (0 to 4 total)
             if (solarCountForHouse > 0) {
                 ctx.fillStyle = "#1E3A8A";
                 ctx.strokeStyle = "#93C5FD";
                 ctx.lineWidth = 1;
-                
-                // First panel on right roof slope
                 ctx.fillRect(48, -24, 22, 12);
                 ctx.strokeRect(48, -24, 22, 12);
-
                 if (solarCountForHouse > 1) {
-                    // Second panel on left roof slope
                     ctx.fillRect(20, -24, 22, 12);
                     ctx.strokeRect(20, -24, 22, 12);
                 }
             }
 
-            // Windows & Door
             ctx.fillStyle = "#38BDF8";
             ctx.fillRect(12, 12, 22, 20);
             ctx.fillRect(56, 12, 22, 20);
 
             ctx.fillStyle = "#475569";
             ctx.fillRect(36, 35, 18, 30);
-
             ctx.restore();
         }
 
@@ -640,56 +911,56 @@
             ctx.save();
             ctx.translate(x, y);
 
-            // Factory Main Building Body
-            ctx.fillStyle = "#2B3E50";
-            ctx.fillRect(0, 0, 160, 95);
-
-            // Three Chimneys with distinct lighter metallic shade to stand out against mountain
-            ctx.fillStyle = "#475569";
-            ctx.fillRect(22, -55, 18, 55);
-            ctx.fillRect(71, -55, 18, 55);
-            ctx.fillRect(120, -55, 18, 55);
-
             ctx.fillStyle = "#1E293B";
-            ctx.fillRect(20, -59, 22, 6);
-            ctx.fillRect(69, -59, 22, 6);
-            ctx.fillRect(118, -59, 22, 6);
+            ctx.fillRect(0, 0, 160, 90);
 
-            // 8 Glowing Orange Windows arranged in 2 rows of 4
-            ctx.fillStyle = "#F59E0B";
+            ctx.fillStyle = "#475569";
+            ctx.fillRect(20, -60, 18, 60);
+            ctx.fillRect(71, -60, 18, 60);
+            ctx.fillRect(122, -60, 18, 60);
+
+            ctx.fillStyle = "#0F172A";
+            ctx.fillRect(17, -64, 24, 6);
+            ctx.fillRect(68, -64, 24, 6);
+            ctx.fillRect(119, -64, 24, 6);
+
+            let effNoise = state.pollution.noise;
+            ctx.fillStyle = effNoise > 7 ? "#EF4444" : "#F59E0B";
             for (let r = 0; r < 2; r++) {
                 for (let c = 0; c < 4; c++) {
-                    ctx.fillRect(14 + c * 36, 15 + r * 38, 22, 26);
+                    ctx.fillRect(14 + c * 36, 16 + r * 38, 22, 26);
                 }
             }
 
-            // Smoke from 3 chimneys
-            if (state.pollution.gas > 0 && Math.random() < (state.pollution.gas * 0.15)) {
-                [31, 80, 129].forEach(sx => {
+            let effGas = state.pollution.gas;
+            if (effGas > 0 && Math.random() < (effGas * 0.18)) {
+                [29, 80, 131].forEach(sx => {
                     state.smokeParticles.push({
                         x: x + sx,
-                        y: y - 55,
-                        vx: (Math.random() - 0.2) * 1.1,
-                        vy: -1.4 - (state.pollution.gas * 0.25),
-                        radius: 8 + Math.random() * 5,
-                        alpha: 0.75
+                        y: y - 62,
+                        vx: (Math.random() - 0.2) * 1.2,
+                        vy: -1.4 - (effGas * 0.25),
+                        radius: 8 + Math.random() * 6,
+                        alpha: 0.8
                     });
                 });
             }
+            ctx.restore();
+        }
 
-            // Hot Steam
-            if (state.pollution.thermal > 0 && Math.random() < (state.pollution.thermal * 0.15)) {
-                state.steamParticles.push({
-                    x: x + 140,
-                    y: y + 80,
-                    vx: 1.2 + Math.random() * 1.5,
-                    vy: (Math.random() - 0.5) * 0.6,
-                    radius: 6 + Math.random() * 6,
-                    alpha: 0.65
+        function drawFullyUndergroundPipeAndDischarge(factoryX, factoryY, riverY) {
+            const pipeX = factoryX + 145;
+            let effThermal = state.pollution.thermal;
+            if (effThermal > 0 && Math.random() < (effThermal * 0.22)) {
+                state.hotWaterParticles.push({
+                    x: pipeX,
+                    y: riverY + 6,
+                    vx: -1.2 - Math.random() * 1.6,
+                    vy: (Math.random() - 0.2) * 0.6,
+                    radius: 5 + Math.random() * 5,
+                    alpha: 0.8
                 });
             }
-
-            ctx.restore();
         }
 
         function renderParticles() {
@@ -704,76 +975,87 @@
                     state.smokeParticles.splice(i, 1);
                     continue;
                 }
-
                 ctx.fillStyle = `rgba(35, 30, 25, ${p.alpha})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            for (let i = state.steamParticles.length - 1; i >= 0; i--) {
-                let p = state.steamParticles[i];
+            for (let i = state.hotWaterParticles.length - 1; i >= 0; i--) {
+                let p = state.hotWaterParticles[i];
                 p.x += p.vx;
                 p.y += p.vy;
-                p.radius += 0.25;
+                p.radius += 0.3;
                 p.alpha -= 0.012;
 
                 if (p.alpha <= 0) {
-                    state.steamParticles.splice(i, 1);
+                    state.hotWaterParticles.splice(i, 1);
                     continue;
                 }
-
-                ctx.fillStyle = `rgba(234, 88, 12, ${p.alpha})`;
+                ctx.fillStyle = `rgba(239, 68, 68, ${p.alpha})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
-        function drawCars(w, roadY, roadH) {
-            const carOffsets = [0, w * 0.35, w * 0.7];
-            const colors = ["#EF4444", "#3B82F6", "#EAB308"];
+        function drawCars(w, roadY, roadH, gasLevel = 5) {
+            let effGas = gasLevel;
+            const totalCars = 2 + Math.max(0, effGas * 1.2); 
+            const colors = ["#EF4444", "#3B82F6", "#EAB308", "#10B981", "#8B5CF6", "#EC4899", "#F97316", "#06B6D4", "#F43F5E", "#A855F7"];
+            const lane1Y = roadY + (roadH * 0.15);
+            const lane2Y = roadY + (roadH * 0.55);
+            const lane1Cars = Math.ceil(totalCars / 2);
+            const lane2Cars = Math.floor(totalCars / 2);
+            const speed = 80;
 
-            carOffsets.forEach((offset, idx) => {
-                let carX = ((state.time * 80 + offset) % (w + 140)) - 70;
-                let cY = roadY + 12 + (idx % 2) * 14;
+            for (let i = 0; i < lane1Cars; i++) {
+                let spacing = (w + 140) / Math.max(1, lane1Cars);
+                let carX = ((state.time * speed + (i * spacing)) % (w + 140)) - 70;
+                drawSingleCar(carX, lane1Y, colors[i % colors.length]);
+            }
+            for (let i = 0; i < lane2Cars; i++) {
+                let spacing = (w + 140) / Math.max(1, lane2Cars);
+                let carX = ((state.time * (speed * 0.9) + (i * spacing) + (spacing / 2)) % (w + 140)) - 70;
+                drawSingleCar(carX, lane2Y, colors[(i + lane1Cars) % colors.length]);
+            }
+        }
 
-                ctx.save();
-                ctx.translate(carX, cY);
+        function drawSingleCar(x, y, color) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, 16);
+            ctx.lineTo(12, 8);
+            ctx.lineTo(28, 4);
+            ctx.lineTo(44, 8);
+            ctx.lineTo(58, 12);
+            ctx.lineTo(60, 18);
+            ctx.closePath();
+            ctx.fill();
 
-                ctx.fillStyle = colors[idx];
-                ctx.beginPath();
-                ctx.moveTo(0, 16);
-                ctx.lineTo(12, 8);
-                ctx.lineTo(28, 4);
-                ctx.lineTo(44, 8);
-                ctx.lineTo(58, 12);
-                ctx.lineTo(60, 18);
-                ctx.closePath();
-                ctx.fill();
+            ctx.fillStyle = "#E0F2FE";
+            ctx.beginPath();
+            ctx.moveTo(16, 8);
+            ctx.lineTo(26, 5);
+            ctx.lineTo(36, 8);
+            ctx.closePath();
+            ctx.fill();
 
-                ctx.fillStyle = "#E0F2FE";
-                ctx.beginPath();
-                ctx.moveTo(16, 8);
-                ctx.lineTo(26, 5);
-                ctx.lineTo(36, 8);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.fillStyle = "#0F172A";
-                ctx.beginPath();
-                ctx.arc(14, 18, 5, 0, Math.PI * 2);
-                ctx.arc(46, 18, 5, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.restore();
-            });
+            ctx.fillStyle = "#0F172A";
+            ctx.beginPath();
+            ctx.arc(14, 18, 5, 0, Math.PI * 2);
+            ctx.arc(46, 18, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
 
         function drawRiver(w, h, riverY, riverH) {
-            let wasteP = state.pollution.waste / 10;
-            let thermalP = state.pollution.thermal / 10;
-
+            let effWaste = state.pollution.waste;
+            let effThermal = state.pollution.thermal;
+            let wasteP = effWaste / 10;
+            let thermalP = effThermal / 10;
             let r = Math.round(180 * wasteP + 20 * (1 - wasteP));
             let g = Math.round(30 * wasteP + 120 * (1 - wasteP));
             let b = Math.round(40 * wasteP + 210 * (1 - wasteP));
@@ -781,15 +1063,13 @@
             ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
             ctx.fillRect(0, riverY, w, riverH);
 
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-            ctx.lineWidth = 1.5;
-            
-            const numLines = 4;
-            for (let i = 0; i < numLines; i++) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+            ctx.lineWidth = 1.8;
+            for (let i = 0; i < 4; i++) {
                 let lineYOffset = riverH * (0.2 + i * 0.2);
                 ctx.beginPath();
-                for (let x = 0; x <= w; x += 2) {
-                    let waveY = riverY + lineYOffset + Math.sin(x * 0.015 + state.time * 2 + i) * 5;
+                for (let x = 0; x <= w; x += 4) {
+                    let waveY = riverY + lineYOffset + Math.sin(x * 0.02 + state.time * 2.5 + i * 1.2) * 4;
                     if (x === 0) ctx.moveTo(x, waveY);
                     else ctx.lineTo(x, waveY);
                 }
@@ -797,7 +1077,6 @@
             }
 
             let activeFish = Math.max(0, Math.round(state.fishes.length * (1 - (wasteP * 0.7 + thermalP * 0.3))));
-            
             for (let i = 0; i < activeFish; i++) {
                 let fish = state.fishes[i];
                 fish.x = (fish.x + fish.speed) % (w + 30);
@@ -807,7 +1086,6 @@
 
                 ctx.save();
                 ctx.translate(fish.x, fy);
-
                 ctx.fillStyle = "#F97316";
                 ctx.beginPath();
                 ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
@@ -824,40 +1102,44 @@
                 ctx.beginPath();
                 ctx.arc(5, -1.5, 1.8, 0, Math.PI * 2);
                 ctx.fill();
-
                 ctx.restore();
             }
         }
 
-        // Main Animation Render Loop
         function render() {
-            const w = canvas.parentElement.clientWidth;
-            const h = canvas.parentElement.clientHeight;
-            
+            const w = canvas.width;
+            const h = canvas.height;
             ctx.clearRect(0, 0, w, h);
             state.time += 0.03;
 
-            // 1. Sky & Birds
-            drawSky(w, h);
+            let remainingSpace = Math.max(0, h - 180);
+            let skyH = Math.max(100, remainingSpace * 0.6);
+            let groundY = skyH;
+            let roadY = groundY + 80;
+            let roadH = 100;
+            let riverY = roadY + roadH;
+            let riverH = Math.max(50, h - riverY);
 
-            let groundY = h * 0.55;
+            drawSky(w, skyH);
 
-            // 2. Mountains & Birds
+            drawCityscape(w, groundY);
             drawMountains(w, groundY);
             drawBirds(w, h);
 
-            // 3. Ground / Land Color Polluted State Transition
-            let totalPollutionVal = state.pollution.gas + state.pollution.waste + state.pollution.thermal + state.pollution.noise;
-            let pollutionRatio = totalPollutionVal / 40; // 0 to 1
+            let effGas = state.pollution.gas;
+            let effWaste = state.pollution.waste;
+            let effThermal = state.pollution.thermal;
+            let effNoise = state.pollution.noise;
+
+            let totalPollutionVal = effGas + effWaste + effThermal + effNoise;
+            let pollutionRatio = totalPollutionVal / 40;
             
-            // Interpolate grass color from lush green (#16A34A) to dry/degraded earth (#714620) based on pollution
             let landR = Math.round(22 * (1 - pollutionRatio) + 113 * pollutionRatio);
             let landG = Math.round(163 * (1 - pollutionRatio) + 70 * pollutionRatio);
             let landB = Math.round(74 * (1 - pollutionRatio) + 32 * pollutionRatio);
             ctx.fillStyle = `rgb(${landR}, ${landG}, ${landB})`;
-            ctx.fillRect(0, groundY, w, h * 0.10);
+            ctx.fillRect(0, groundY, w, 80);
 
-            // 4. Infrastructure Placement (Distributing solar panels accurately between the 2 houses)
             let solarTotal = state.infra.solar;
             let house1Solar = Math.min(2, solarTotal);
             let house2Solar = Math.max(0, solarTotal - 2);
@@ -873,14 +1155,12 @@
                 drawTree(w * 0.01, groundY, 1.0);
             }
 
-            drawClassicFactory(w * 0.74, groundY - 60);
+            const factoryX = w * 0.72;
+            const factoryY = groundY - 55;
+            drawClassicFactory(factoryX, factoryY);
 
-            // 5. Particles
-            renderParticles();
+            drawFullyUndergroundPipeAndDischarge(factoryX, factoryY, riverY);
 
-            // 6. Road & Cars
-            let roadY = groundY + (h * 0.08);
-            let roadH = h * 0.12;
             ctx.fillStyle = "#1E293B";
             ctx.fillRect(0, roadY, w, roadH);
 
@@ -893,12 +1173,9 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            drawCars(w, roadY, roadH);
-
-            // 7. River & Continuous Waves & Fish
-            let riverY = roadY + roadH;
-            let riverH = h - riverY;
+            drawCars(w, roadY, roadH, state.pollution.gas);
             drawRiver(w, h, riverY, riverH);
+            renderParticles();
 
             requestAnimationFrame(render);
         }
