@@ -64,7 +64,7 @@
             </div>
             <div class="flex flex-col gap-2">
                 <label for="user-name-input" class="text-xs font-bold text-slate-300">Your Full Name:</label>
-                <input type="text" id="user-name-input" placeholder="e.g. Jannah Shabeer" class="bg-[#080F19] border border-[#2A3F5F] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500" value="Jannah Shabeer">
+                <input type="text" id="user-name-input" placeholder="" class="bg-[#080F19] border border-[#2A3F5F] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500" value="">
             </div>
             <button onclick="startStudentSession()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition shadow-lg mt-2">
                 Enter Simulation Lab <i class="fa-solid fa-arrow-right ml-1"></i>
@@ -494,18 +494,24 @@
         const db = firebase.database();
         // --------------------------------------------------------- //
 
-        let currentUserName = "Jannah Shabeer";
+        let currentUserName = "";
 
         function startStudentSession() {
-            const nameInput = document.getElementById('user-name-input').value.trim();
-            if (nameInput) {
-                currentUserName = nameInput;
-            }
-            document.getElementById('active-user-display').innerText = `USER: ${currentUserName.toUpperCase()}`;
-            document.getElementById('header-subtitle').innerText = `Student Lab • ${currentUserName} (10G)`;
-            document.getElementById('welcome-modal').classList.add('hidden');
-            recalculateMetrics();
-        }
+    const nameInput = document.getElementById('user-name-input').value.trim();
+    
+    // Check if the input is empty
+    if (!nameInput) {
+        alert("Please enter your full name to begin the activity.");
+        return; // Stop the function here so the lab doesn't open
+    }
+    
+    currentUserName = nameInput;
+    
+    document.getElementById('active-user-display').innerText = `USER: ${currentUserName.toUpperCase()}`;
+    document.getElementById('header-subtitle').innerText = `Student Lab • ${currentUserName} (10G)`;
+    document.getElementById('welcome-modal').classList.add('hidden');
+    recalculateMetrics();
+}
 
         let keyBuffer = "";
         window.addEventListener('keydown', (e) => {
@@ -780,7 +786,7 @@
                 impactBox.className = 'bg-emerald-950/20 border border-emerald-900/50 rounded-lg p-4';
                 impactHeading.className = 'text-emerald-400 font-bold text-xs mb-1.5 flex items-center gap-2';
                 impactHeading.innerHTML = `<i class="fa-solid fa-circle-check"></i> OPTIMAL BALANCED STATE:`;
-                impactDesc.innerText = "Wildlife is flourishing perfectly. Birds are nesting safely, marine species are active, and foliage density is high. Sustainable practices are maintaining ideal environmental health.";
+                impactDesc.innerText = "Wildlife is flourishing perfectly. Birds are nesting safely, marine species are active, and foliage density is high.";
             }
 
             document.getElementById('health-pct-text').style.color = themeColor;
